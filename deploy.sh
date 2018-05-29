@@ -4,5 +4,5 @@
 # docker run -it --network=host backend
 # docker run -it --network=host webapp
 #
-docker-compose down
-docker-compose up
+docker-compose build backend
+docker-compose run backend

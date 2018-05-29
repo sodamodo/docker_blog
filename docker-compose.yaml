@@ -2,35 +2,34 @@ version: '2'
 services:
 
   backend:
-    container_name: backend
     build:
       context: ./GIS_tutorial_backend
     ports:
       - "8000:8000"
-    networks:
-      - gis
+    # networks:
+    #   - gis
     command: python3 -u manage.py runserver 0.0.0.0:8000
-
-  nginx:
-    image: nginx:latest
-    ports:
-      - "8080:80"
-    volumes:
-      - ./GIS_tutorial_backend:/src
-      - ./config/nginx:/etc/nginx/conf.d
-      - /static:/static
-    networks:
-      - gis
-
-    depends_on:
-      - backend
+    network_mode: host
+  #
+  # nginx:
+  #   image: nginx:latest
+  #   ports:
+  #     - "8080:80"
+  #   volumes:
+  #     - ./GIS_tutorial_backend:/src
+  #     - ./config/nginx:/etc/nginx/conf.d
+  #     - /static:/static
+  #   network_mode: host
+  #
+  #   depends_on:
+  #     - backend
 
 
 
 #
 networks:
   gis:
-    driver: host
+    driver: bridge
 
 
 #   database:
