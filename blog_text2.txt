@@ -1,0 +1,122 @@
+USING DOCKER, POSTGIS, AND DJANGO TO HELP DEVELOP YOUR GIS WEB APP
+
+This article will show you how to use Docker and Django to create a database backend for your webapp to access data. The webapp I will be showing you how to create uses javascript to pull GeoJSON through a Django proxy to display locations of cities and their names on a Leaflet map. If you haven't already, follow the tutorial here on how to install docker on linux[1]. 
+
+# Creating the database
+
+First, let's create the database. Fortunately a PostGIS docker image has already been created, so we will only beed to pull the image and run it with our own specific parameters. Before we run the docker image, we will need to create a volume so that our data will persist even if the database process fails.
+
+`docker create volume pg_data`
+
+Now lets launch the PostGIS container. 
+
+`docker run --name=postgis -d -e POSTGRES_USER=gisuser -e POSTGRES_PASS=password -e POSTGRES_DBNAME=gis -e ALLOW_IP_RANGE=0.0.0.0/0 -p 5432:5432 -v point_volume:/var/lib/postgresql --restart=always kartoza/postgis:9.6-2.4`
+
+The -e flags pass in the enviroment variables including ALLOW_IP_RANGE which specifies where database calls from any source and the -v flag maps the volume we have created to the storage folder on the Postgres process.  
+
+You can see that the container running with the `docker ps` command. 
+
+##################
+I now need to load the data that my data that my webapp will be using into the database. If your data is not already in a shapefile 
+##################
+
+
+# Django
+
+For security reasons, you do not want to make database calls directly from your javascript web app so you need a backend server to proxy your data calls to PostGIS. I am using Django as the proxy server but there are many other options available. Python uses the psycopg2 library to interact with Postgres, in a new file called database.py, I created a method which creates the connection to the database and returns an object that allows you to interact with it.
+
+Before continuing, we need to change some settings so that ALLOWED_HOSTS = [*] and ###CSRF EXEMPT MIDDLEWARE CLASS###
+
+
+`
+import psycopg2
+
+def get_cursor():
+    conn = psycopg2.connect(dbname="gis", user="gisuser", password="password", host="localhost")
+    cursor = conn.cursor()
+    return cursor
+`
+
+With the database object in hand, create a method which accepts requests to your webapp and then makes calls to the database. 
+
+`
+from django.views.decorators.csrf import csrf_exempt
+from django.http import JsonResponse
+
+@csrf_exempt
+def get_points(request):
+    cur = get_cursor()
+
+    cur.execute("""
+                SELECT json_build_object(
+                    'type',       'Feature',
+                    'geometry',   ST_AsGeoJSON(the_geom :: geometry) :: json,
+                    'properties', json_build_object(
+                                  'name', name
+                                  )
+                    ) jsonb FROM point_table;	
+                """)
+
+    points = cur.fetchone()
+
+    json_points = points[0]
+    return JsonResponse(json_points)
+`
+
+This example webapp only queries a single data layer from the PostGIS database, the method does not require parameters. This method retrieves the names and coordinates of the cities in the "point table" using PostgreSQL's native json_build_object() method so that we do not have tot ransform the raw data into GeoJSON objects at either the Django or frontend level. Since this is a development environment, it is necessary to use the CSRF exempt decorator for this method. 
+
+In the urls.py module, add a URL/method mapping so that the front end app will have an endpoint that it can call the function with. 
+
+`
+from django.urls import path
+from GIS_tutorial_backend.views import get_all_states, get_state, get_points
+urlpatterns = [
+    path('get_points/', get_points)
+]
+`
+
+Now let's Dockerize your Django service! There are precreated Django images in repositories, however these are for production deployments so we will create our own for our testing environment. Create a Dockerfile in the root level of your Django Project.
+
+###THIS WORKS BUT IS UGGO. NEEDS FIXED#####
+-WORKDIR doesn't need to exist
+-COPY commands can be combined
+
+`
+FROM python:3.6
+WORKDIR /app
+COPY GIS_tutorial_backend GIS_tutorial_backend
+COPY manage.py requirements.txt /app/
+RUN pip install -r requirements.txt
+EXPOSE 8000
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+`
+Let's take a look at what the contents of the Dockerfile are doing.
+
+-FROM pulls down the python docker image as the base image to work with
+-WORKDIR sets the default directory for all future commands to run from
+-COPY copies files from your project onto the container's file system
+-CMD launches the actual development server. 
+
+Now the Dockerfile needs to be built into it's own docker image.
+
+`docker build -t django_proxy .`
+
+The `docker build` looks for a file named Dockerfile to build, so as long as you are running the command in the same folder as the Dockerfile you only need to input "docker build .", however the -t flag allows us to tag the image so that we have an easy way to reference when we run the image. Let's do that now. 
+
+`docker run --network=host django_proxy`
+
+Check that is it working by opening http://0.0.0.0:8000 in your browser, this will return a GeoJSON object:
+
+{"type": "Feature", "geometry": {"type": "Point", "coordinates": [-122.15683, 37.725685]}, "properties": {"name": "Oakland"}} 
+
+Now that we can successfully retrieve JSON with a get request, we are now ready to create our front end web application. 
+
+####Explain need for CSRF off Chrome extensio#######
+
+
+########################
+#####HTML HERE##########
+########################
+
+
+[1] https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-16-04

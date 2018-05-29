@@ -1,0 +1,32 @@
+version: '2'
+services:
+
+
+  backend:
+    container_name: backend
+    build: GIS_tutorial_backend/.
+
+  nginx:
+    image: nginx:latest
+    container_name: webserver
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./GIS_tutorial_backend:/src
+      - ./config/nginx:/etc/nginx/conf.d
+      - /static:/static
+    depends_on:
+      - backend
+
+
+#
+# networks:
+#   gis:
+#     driver: host
+
+
+#   database:
+#     container_name: database
+#     build: GIS_container/.
+#     networks:
+#       - database

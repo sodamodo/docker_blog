@@ -1,0 +1,50 @@
+Today I will show you how to deploy a basic web GIS application using Docker. Docker will host two containers, a Django container and a PostGIS container. The Django backend serves as a proxy so that the web application does not have to make calls directly to the hosted database. Let's start by setting up the PostGIS database and loading data into it. Instructions how to install docker on Ubuntu may be found here[1]
+
+
+In your project folder create a folder called postgis, and inside that folder create a new Dockerfile. 
+
+FROM kartoza/postgis:9.6-2.4
+Docker uses volumes to store the data. use the VOLUME command to show 
+VOLUME "/data"
+ENV POSTGRES_USER=user
+ENV POSTGRES_PASS=password
+ENV POSTGRES_DBNAME=gis
+EXPOSE 5432
+'
+
+#### EXPLAIN REASONING BEHIND DOCKERFILE###
+
+
+
+
+After saving your Dockerfile, tag and build image.
+
+'$ docker build -t postgis .'
+
+now run the container. 
+
+'docker run -d postgis'
+
+Now we will need to insert data into your database to be retrieved by the webapp. Open up psql and log into the database. 
+
+'$ 
+
+
+
+SCRIPT PARTS
+
+1) CREATE AND RUN POSTGIS CONTAINER
+   a) https://stackoverflow.com/questions/44731451/how-to-run-a-docker-container-if-not-already-running
+
+2) LOAD YOUR DATA
+
+3) 
+
+
+
+
+
+
+[1] https://www.digitalocean.com/community/tutorials/how-to-install-and-use-docker-on-ubuntu-16-04
+
+
